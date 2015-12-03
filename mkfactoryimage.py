@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-"""
-===========================================================================
-
-  Copyright (c) 2015 TCL.
-  Author chunhua.chen 
-
-===========================================================================
-"""
-
+#===========================================================================
+#
+#  Copyright (c) 2015 TCL.
+#  Author chunhua.chen 
+#
+#===========================================================================
+#
 """
 merge image to factory image
 
@@ -490,20 +488,20 @@ def dump_image(image, partitions):
     outimg.write(image.read(size))
     outimg.close()
 
-if __name__ == "__main__":
 
-  if len(sys.argv) != 4:
+def main(argv):
+  if len(argv) != 3:
     usage()
   
   cmd = 'm'
-  if sys.argv[1] == 'd':
+  if argv[0] == 'd':
     cmd = 'd'
-  elif sys.argv[1] == 'm':
+  elif argv[0] == 'm':
     cmd = 'm'
   else:
     usage()
 
-  imagedir = sys.argv[2]
+  imagedir = argv[1]
   imagetype = 0
   rawprogram_path = os.path.join(imagedir,"rawprogram0.xml")
   if not os.path.exists(rawprogram_path):
@@ -518,10 +516,13 @@ if __name__ == "__main__":
 
   partitions = ParseXML(rawprogram_path)
   if cmd == 'm':
-    image = open(sys.argv[3], 'w+b')
+    image = open(argv[2], 'w+b')
     merge_image(partitions, imagetype, imagedir, image)
     image.close()
   else:
-    image = open(sys.argv[3], 'rb')
+    image = open(argv[2], 'rb')
     dump_image(image, partitions)
     image.close()
+
+if __name__ == "__main__":
+  main(sys.argv[1:])
