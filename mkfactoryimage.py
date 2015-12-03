@@ -88,6 +88,13 @@ def usage():
   print """
   Examples:
   python ~/tools/mkfactoryimage.py m  ~/version/vBA4   ~/output/factoryimage_vBA4.bin
+
+  When use the python script in new project, pls modify
+  EMMC_CAPACITY
+  ImagesMap
+
+  NOTE:
+  EMMC_CAPACITY can read  use emmcdl or log of Teleweb
 """
   exit(1)
 
@@ -370,6 +377,8 @@ def merge_image(partitions, imagetype, imagedir, image):
       print("label:%s patch the traceability version(%s) ..." % (label, version))
       patch_traceability(version, image, soffset, size)
       continue
+    if label == 'fsg':
+      fn = 'studypara.mbn'
     if label == 'simlock':
       """
       fix simlock
@@ -408,6 +417,7 @@ def merge_image(partitions, imagetype, imagedir, image):
     infile = open(fn, 'rb')
     magic = struct.unpack('<I',infile.read(struct.calcsize('I')))[0]
     print("label:%s magic:0x%x" % (label, magic))
+    print os.popen('file %s' % infile.name, 'r').read()
     print("write %s to factoryimage..." % fn)
     if magic == ZIP_HEADER_MAGIC:
       infile.close();
