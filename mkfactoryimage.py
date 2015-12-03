@@ -85,6 +85,10 @@ ENTRY_SIZE=0x080
 
 def usage():
   print "Usage: %s <m|d> <imagedir> <factoryimage> " % sys.argv[0]
+  print """
+  Examples:
+  python ~/tools/mkfactoryimage.py m  ~/version/vBA4   ~/output/factoryimage_vBA4.bin
+"""
   exit(1)
 
 def CmpPartition(x,y):
