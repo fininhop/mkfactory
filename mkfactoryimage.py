@@ -17,6 +17,7 @@ import sys,os
 import glob
 import struct
 import binascii
+import  zipfile
 from xml.etree import ElementTree as ET
 
 EMMC_BLOCK_SIZE=512
@@ -55,6 +56,7 @@ ImagesMap = {
 
 
 SPARSE_HEADER_MAGIC=0xed26ff3a
+ZIP_HEADER_MAGIC=0x04034b50
 CHUNK_TYPE_RAW=0xCAC1
 CHUNK_TYPE_FILL=0xCAC2
 CHUNK_TYPE_DONT_CARE=0xCAC3
@@ -156,7 +158,7 @@ def copy_sparse_image(imgin, imgout, offset, size):
   total_chunks = struct.unpack('<I',imgin.read(struct.calcsize('I')))[0]
   #print "file_hdr_sz:%s chunk_hdr_sz:%s, blk_sz:%s total_blks:%s total_chunks:%s" % (file_hdr_sz, chunk_hdr_sz, blk_sz, total_blks, total_chunks)
   if total_blks * blk_sz > size:
-    print("size too large %d" % (total_blks * blk_sz))
+    print("ERROR: %s size(%d) too large in partition(%d)" % (imgin.name, total_blks * blk_sz, size))
     sys.exit(1)
 
   imgin.seek(file_hdr_sz, 0)
@@ -175,14 +177,14 @@ def copy_sparse_image(imgin, imgout, offset, size):
 
     if chunk_type == CHUNK_TYPE_RAW:
       if total_sz != chunk_hdr_sz + chunk_data_sz:
-        print("Bogus chunk size for chunk type Raw")
+        print("ERROR:Bogus chunk size for chunk type Raw")
         sys.exit(1);
       imgout.seek(offset+total_blocks*blk_sz,0)
       imgout.write(imgin.read(chunk_data_sz))
       total_blocks += chunk_sz
     elif chunk_type == CHUNK_TYPE_FILL:
       if total_sz != chunk_hdr_sz + struct.calcsize('<I'):
-        print("Bogus chunk size for chunk type FILL")
+        print("ERROR:Bogus chunk size for chunk type FILL")
         sys.exit(1);
       fill_val = imgin.read(struct.calcsize('<I'))
       chunk_blk_cnt = chunk_data_sz/blk_sz
@@ -195,14 +197,14 @@ def copy_sparse_image(imgin, imgout, offset, size):
       total_blocks += chunk_sz
     elif chunk_type == CHUNK_TYPE_CRC:
       if total_sz != chunk_hdr_sz:
-        print("Bogus chunk size for chunk type Dont Care")
+        print("ERROR:Bogus chunk size for chunk type Dont Care")
         sys.exit(1);
       total_blocks += chunk_sz
       imgin.seek(chunk_data_sz, 1)
     else:
-      print("Unkown chunk type:%x" % chunk_type)
+      print("ERROR:Unkown chunk type:%x" % chunk_type)
       sys.exit(1);
-    if offset + total_blocks*blk_sz >= FACTORY_IMAGE_SIZE:
+    if offset + total_blocks*blk_sz > FACTORY_IMAGE_SIZE:
       print("merge all image done")
       imgin.close()
       imgout.close()
@@ -214,8 +216,10 @@ def copy_sparse_image(imgin, imgout, offset, size):
     print "sparse image end pad"
     zerofile = open('/dev/zero', 'rb')
     imgout.write(zerofile.read(pad))
+  elif pad == 0:
+    print "sparse image done"
   else:
-    print("sparse image write failure")
+    print("ERROR: sparse image write failure")
     sys.exit(1);
 
 def partition_parse_gpt_header(buff):
@@ -305,14 +309,14 @@ def merge_image(partitions, imagetype, imagedir, image):
       """
       fix simlock
       """
-      print("skip simlock")
+      print("WARN:skip simlock")
       continue
     if not fn:
       print("label:%s padding %s size of zero..." % (label, size))
       zerofile = open('/dev/zero', 'rb')
       image.seek(soffset, 0)
       if (soffset != image.tell()):
-        print("wrong soffset")
+        print("ERROR: wrong soffset")
         sys.exit(1)
       image.write(zerofile.read(size))
       zerofile.close()
@@ -323,14 +327,53 @@ def merge_image(partitions, imagetype, imagedir, image):
       paths = glob.glob(os.path.join(imagedir,ImagesMap[label]))
       if paths:
         fn = paths[0];
+      else:
+        paths = glob.glob(os.path.join(imagedir,"%s.%s" % (ImagesMap[label][:-4], 'zip')))
+        if paths:
+          fn = paths[0];
     if not os.path.exists(fn):
-      print "Could not found the image:%s" % fn
+      print "WARN:Could not found the image:%s" % fn
       continue
     infile = open(fn, 'rb')
     magic = struct.unpack('<I',infile.read(struct.calcsize('I')))[0]
     print("label:%s magic:0x%x" % (label, magic))
     print("write %s to factoryimage..." % fn)
-    if magic == SPARSE_HEADER_MAGIC:
+    if magic == ZIP_HEADER_MAGIC:
+      infile.close();
+      input_zip = zipfile.ZipFile(fn, 'r');
+      i = 0;
+      for n in input_zip.namelist():
+        i += 1;
+        if i > 1:
+          print("ERROR:too many file in zipfile:%s" % fn)
+          sys.exit(1)
+        infile = input_zip.open(n);
+      inmagic = struct.unpack('<I',infile.read(struct.calcsize('I')))[0]
+      print("label:%s magic:0x%x in %s" % (label, inmagic, fn))
+      print("write %s in %s to factoryimage..." % (n, fn))
+      infile.close();
+      if  inmagic == SPARSE_HEADER_MAGIC:
+        print("ERROR: not support")
+        sys.exit(1)
+      image.seek(soffset, 0)
+      if (soffset != image.tell()):
+        print("ERROR: seek fail wrong soffset")
+        sys.exit(1)
+      infile = input_zip.open(n)
+      count = input_zip.getinfo(n).file_size
+      if count >  size:
+        print("ERROR: image %s(%d) too large in partition size(%d) " % ( infile.name, count, size))
+        sys.exit(1)
+      blksize = 32*1024*1024
+      while count > 0:
+        if count > blksize:
+          image.write(infile.read(blksize))
+          count -= blksize
+        else:
+          image.write(infile.read(count))
+          count = 0;
+      input_zip.close()
+    elif  magic == SPARSE_HEADER_MAGIC:
       print("unsparse image...")
       infile.seek(0,0)
       copy_sparse_image(infile,image, soffset, size)
@@ -338,9 +381,12 @@ def merge_image(partitions, imagetype, imagedir, image):
       infile.seek(0,0)
       image.seek(soffset, 0)
       if (soffset != image.tell()):
-        print("wrong soffset")
+        print("ERROR: seek fail wrong soffset")
         sys.exit(1)
       image.write(infile.read(size))
+      if infile.tell() > size:
+        print("ERROR: %s size(%d) too large in partition(%d)" % (infile.name, infile.tell(), size))
+        sys.exit(1)
       if label == 'PrimaryGPT':
         patch_gpt(infile, image)
     infile.close()
