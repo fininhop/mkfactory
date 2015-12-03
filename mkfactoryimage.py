@@ -2,7 +2,7 @@
 """
 ===========================================================================
 
-  Copyright (c) 2014 TCL.
+  Copyright (c) 2015 TCL.
   Author chunhua.chen 
 
 ===========================================================================
@@ -85,9 +85,8 @@ ENTRY_SIZE=0x080
 
 def usage():
   print "Usage: %s <m|d> <imagedir> <factoryimage> " % sys.argv[0]
-  print """
-  Examples:
-  python ~/tools/mkfactoryimage.py m  ~/version/vBA4   ~/output/factoryimage_vBA4.bin
+  print"""Examples:
+  python ~/tools/mkfactoryimage.py m  ~/myprj/Pixi47TMO/appli/vBA4  ~/output/factoryimage_vBA4.bin
 
   When use the python script in new project, pls modify
   EMMC_CAPACITY
