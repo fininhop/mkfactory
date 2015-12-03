@@ -232,8 +232,21 @@ def partition_parse_gpt_header(buff):
   partition_entry_size = struct.unpack('<L', buff[PENTRY_SIZE_OFFSET:PENTRY_SIZE_OFFSET+4])[0]
   print("header size %d,usable lba 0x%lx, max partition count %d, parition entry size %d" % (header_size, first_usable_lba, max_partition_count, partition_entry_size))
   return (int(0),first_usable_lba, partition_entry_size, header_size, max_partition_count)
-  
-    
+
+
+
+def patch_traceability(version, outimg, offset, size):
+  """
+  patch the traceability partition
+  """
+  INFO_PTS_MINI_OFFSET=50
+  MINIMODE_SFLAG_OFFSET=310
+  MINIMODE_SFLAG_MAGIC=0xb4a59687
+  outimg.seek(offset+INFO_PTS_MINI_OFFSET, 0)
+  outimg.write(struct.pack('%ds' % (len(version)), version))
+  outimg.seek(offset+MINIMODE_SFLAG_OFFSET, 0)
+  outimg.write(struct.pack('<I', MINIMODE_SFLAG_MAGIC))
+ 
 def patch_gpt(infile, image):
   """
   patch the gpt for the real emmc
@@ -288,6 +301,47 @@ def patch_gpt(infile, image):
   image.seek(EMMC_BLOCK_SIZE + HEADER_CRC_OFFSET,0)
   image.write(struct.pack('<I', crc_value))
 
+def detect_version(partitions, imagetype, imagedir):
+  BOOT_IMAGE_VERSION_OFFSET=0x30
+  fn = None
+  label = None
+  for p in partitions:
+    fn = p['filename']
+    label = p['label']
+    if label != 'boot':
+      continue
+    if imagetype == 0:
+      fn = os.path.join(imagedir,fn)
+    else:
+      paths = glob.glob(os.path.join(imagedir,ImagesMap[label]))
+      if len(paths) > 1:
+        print("ERROR: match too many files %s" % paths)
+        sys.exit(1)
+      if paths:
+        fn = paths[0];
+      else:
+        paths = glob.glob(os.path.join(imagedir,"%s.%s" % (ImagesMap[label][:-4], 'zip')))
+        if len(paths) > 1:
+          print("ERROR: match too many files %s" % paths)
+          sys.exit(1)
+        if paths:
+          fn = paths[0];
+    if not os.path.exists(fn):
+      print "ERROR:version detect Could not found the image:%s" % fn
+      sys.exit(1)
+    else:
+      break
+  infile = open(fn, 'rb')
+  infile.seek(BOOT_IMAGE_VERSION_OFFSET,0)
+  vers = struct.unpack("12s", infile.read(12))[0]
+  infile.close()
+  print("detect versions(%s) in %s" %(vers, fn))
+  #print("detect %s %s %s" % (fn[-16:-4], vers[2:5], fn[-14:-11]))
+  if imagetype == 0 or vers == fn[-16:-4]:
+    return vers[2:5]
+  else:
+    return fn[-14:-11]
+
 def merge_image(partitions, imagetype, imagedir, image):
   for p in partitions:
     fn = p['filename']
@@ -304,7 +358,10 @@ def merge_image(partitions, imagetype, imagedir, image):
       """
       fix traceability fn
       """
-      fn = 'Traceability.bin'
+      version = detect_version(partitions, imagetype, imagedir)
+      print("label:%s patch the traceability version(%s) ..." % (label, version))
+      patch_traceability(version, image, soffset, size)
+      continue
     if label == 'simlock':
       """
       fix simlock
