@@ -243,6 +243,10 @@ def patch_traceability(version, outimg, offset, size):
   """
   patch the traceability partition
   """
+  """
+  partition offset + 67 is traceability
+  """
+  offset += 67
   INFO_PTS_MINI_OFFSET=50
   MINIMODE_SFLAG_OFFSET=310
   MINIMODE_SFLAG_MAGIC=0xb4a59687
