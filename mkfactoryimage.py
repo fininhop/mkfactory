@@ -325,10 +325,16 @@ def merge_image(partitions, imagetype, imagedir, image):
       fn = os.path.join(imagedir,fn)
     else:
       paths = glob.glob(os.path.join(imagedir,ImagesMap[label]))
+      if len(paths) > 1:
+        print("ERROR: match too many files %s" % paths)
+        sys.exit(1)
       if paths:
         fn = paths[0];
       else:
         paths = glob.glob(os.path.join(imagedir,"%s.%s" % (ImagesMap[label][:-4], 'zip')))
+        if len(paths) > 1:
+          print("ERROR: match too many files %s" % paths)
+          sys.exit(1)
         if paths:
           fn = paths[0];
     if not os.path.exists(fn):
