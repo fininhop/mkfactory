@@ -46,8 +46,9 @@ ImagesMap = {
         'hdcp':'H*.mbn',
         'cache':'I*.mbn',
         'userdata':'U*.mbn',
-        'simlock':'',
-        'traceability':'Traceability.bin',
+        'simlock':'X*.mbn',
+        'traceability':'stub.bin',
+        'misc':'stub.bin',
         'PrimaryGPT':'O*.mbn',
         'BackupGPT':'G*.mbn',
 }
@@ -259,6 +260,14 @@ def patch_traceability(version, outimg, offset, size):
   outimg.seek(offset+MINIMODE_SFLAG_OFFSET, 0)
   outimg.write(struct.pack('<I', MINIMODE_SFLAG_MAGIC))
  
+def patch_misc(outimg, offset, size):
+  """
+  patch the misc partition
+  """
+  ffbm='ffbm-01'
+  outimg.seek(offset, 0)
+  outimg.write(struct.pack('%ds' % (len(ffbm)), ffbm))
+
 def patch_gpt(infile, image):
   """
   patch the gpt for the real emmc
@@ -374,14 +383,12 @@ def merge_image(partitions, imagetype, imagedir, image):
       print("label:%s patch the traceability version(%s) ..." % (label, version))
       patch_traceability(version, image, soffset, size)
       continue
+    if label == 'misc':
+      print("label:%s patch the misc ...")
+      patch_misc(image, soffset, size)
+      continue
     if label == 'fsg':
       fn = 'studypara.mbn'
-    if label == 'simlock':
-      """
-      fix simlock
-      """
-      print("WARN:skip simlock")
-      continue
     if not fn:
       print("label:%s padding %s size of zero..." % (label, size))
       zerofile = open('/dev/zero', 'rb')
