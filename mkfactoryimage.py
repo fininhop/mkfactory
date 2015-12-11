@@ -253,9 +253,12 @@ def patch_traceability(version, outimg, offset, size):
   """
   offset += 67
   INFO_PTS_MINI_OFFSET=50
+  INFO_PTS_CU_OFFSET=186
   MINIMODE_SFLAG_OFFSET=310
   MINIMODE_SFLAG_MAGIC=0xb4a59687
   outimg.seek(offset+INFO_PTS_MINI_OFFSET, 0)
+  outimg.write(struct.pack('%ds' % (len(version)), version))
+  outimg.seek(offset+INFO_PTS_CU_OFFSET, 0)
   outimg.write(struct.pack('%ds' % (len(version)), version))
   outimg.seek(offset+MINIMODE_SFLAG_OFFSET, 0)
   outimg.write(struct.pack('<I', MINIMODE_SFLAG_MAGIC))
